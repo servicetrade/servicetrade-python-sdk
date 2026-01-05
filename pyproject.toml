@@ -39,9 +39,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0.0",
-    "pytest-cov>=4.0.0",
     "responses>=0.23.0",
-    "ruff>=0.1.0",
     "mypy>=1.0.0",
     "types-requests>=2.28.0",
 ]
@@ -64,27 +62,6 @@ packages = ["src/servicetrade"]
 testpaths = ["tests"]
 pythonpath = ["src"]
 
-[tool.ruff]
-target-version = "py39"
-line-length = 88
-
-[tool.ruff.lint]
-select = [
-    "E",   # pycodestyle errors
-    "W",   # pycodestyle warnings
-    "F",   # Pyflakes
-    "I",   # isort
-    "B",   # flake8-bugbear
-    "C4",  # flake8-comprehensions
-    "UP",  # pyupgrade
-]
-ignore = [
-    "E501",  # line too long (handled by formatter)
-]
-
-[tool.ruff.lint.isort]
-known-first-party = ["servicetrade"]
-
 [tool.mypy]
 python_version = "3.9"
 warn_return_any = true
@@ -99,15 +76,3 @@ warn_unused_ignores = true
 [[tool.mypy.overrides]]
 module = "tests.*"
 disallow_untyped_defs = false
-
-[tool.coverage.run]
-source = ["servicetrade"]
-branch = true
-
-[tool.coverage.report]
-exclude_lines = [
-    "pragma: no cover",
-    "def __repr__",
-    "raise NotImplementedError",
-    "if TYPE_CHECKING:",
-]
