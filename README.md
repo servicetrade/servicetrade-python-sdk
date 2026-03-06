@@ -62,8 +62,7 @@ jobs = client.get("/job")
 result = client.get("/job/123")
 
 # GET with query parameters
-data = client.get("/job", params={"status": "scheduled", "locationId": 456})
-jobs = data["jobs"]
+jobs = client.get("/job", params={"status": "scheduled", "locationId": 456})
 
 # POST request
 job = client.post("/job", {

@@ -166,7 +166,11 @@ class ServicetradeClient:
         if not self._token:
             # No token at all — lazy auth
             self.login()
-        elif self._options.auto_refresh_auth and self._is_token_stale():
+        elif (
+            self._options.auto_refresh_auth
+            and self._credentials is not None
+            and self._is_token_stale()
+        ):
             # Token exists but is stale — refresh
             self.login()
 
@@ -204,7 +208,13 @@ class ServicetradeClient:
             response.raise_for_status()
 
             data = response.json()
-            self._token = data.get("access_token")
+            access_token = data.get("access_token") if isinstance(data, dict) else None
+            if not access_token:
+                raise ServicetradeAuthError(
+                    "Authentication failed: missing access_token in token response"
+                )
+
+            self._token = access_token
             self._token_expiry = None  # Reset to force re-parsing
 
             # Update refresh token if provided
@@ -296,7 +306,11 @@ class ServicetradeClient:
                 raise ValueError(f"Unsupported HTTP method: {method}")
 
             # Handle 401 with auto-refresh
-            if response.status_code == 401 and self._options.auto_refresh_auth:
+            if (
+                response.status_code == 401
+                and self._options.auto_refresh_auth
+                and self._credentials is not None
+            ):
                 self.login()
                 headers = self._get_headers()
                 # Retry the request

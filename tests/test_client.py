@@ -531,7 +531,6 @@ class TestGetAuthToken:
 class TestGetLastResponse:
     """Test get_last_response()."""
 
-    @responses.activate
     def test_returns_none_before_request(self):
         client = ServicetradeClient(client_id="id", client_secret="secret")
         assert client.get_last_response() is None
@@ -594,7 +593,7 @@ class TestReentrancyGuard:
             status=200,
         )
 
-        def bad_callback(t: str) -> None:
+        def bad_callback(_t: str) -> None:
             client.login()  # This should trigger reentrancy guard
 
         client = ServicetradeClient(

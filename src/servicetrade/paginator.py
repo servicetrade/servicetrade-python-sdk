@@ -40,8 +40,15 @@ class Paginator:
             if not isinstance(response, dict):
                 return
 
-            total_pages = response.get("totalPages", 1)
+            raw_total_pages = response.get("totalPages", 1)
+            try:
+                total_pages = max(int(raw_total_pages), 1)
+            except (TypeError, ValueError):
+                total_pages = 1
+
             items: List[Dict[str, Any]] = response.get(self._items_key, [])
+            if not isinstance(items, list):
+                items = []
 
             yield from items
 
