@@ -10,24 +10,6 @@ pip install servicetrade
 
 ## Quick Start
 
-### Using Username/Password
-
-```python
-from servicetrade import ServicetradeClient
-
-client = ServicetradeClient(
-    username="user@example.com",
-    password="your_password"
-)
-
-# Login to get access token
-client.login()
-
-# Make API requests
-jobs = client.get("/job")
-print(jobs)
-```
-
 ### Using Client Credentials
 
 ```python
@@ -38,11 +20,12 @@ client = ServicetradeClient(
     client_secret="your_client_secret"
 )
 
-client.login()
+# No need to call login() — the SDK authenticates lazily on the first API call.
 jobs = client.get("/job")
+print(jobs)
 ```
 
-### Using Refresh Token (Recommended)
+### Using Refresh Token
 
 ```python
 from servicetrade import ServicetradeClient
@@ -51,20 +34,19 @@ client = ServicetradeClient(
     refresh_token="your_refresh_token"
 )
 
-client.login()
 jobs = client.get("/job")
 ```
 
-### Using Pre-existing Token
+### Using a Pre-existing Token
 
 ```python
 from servicetrade import ServicetradeClient
 
 client = ServicetradeClient(
     token="your_bearer_token",
-    # Provide credentials for auto-refresh
-    username="user@example.com",
-    password="your_password"
+    # Provide credentials for auto-refresh when the token expires
+    client_id="your_client_id",
+    client_secret="your_client_secret"
 )
 
 # No login needed if token is valid
@@ -79,23 +61,54 @@ jobs = client.get("/job")
 # GET request
 result = client.get("/job/123")
 
+# GET with query parameters
+data = client.get("/job", params={"status": "scheduled", "locationId": 456})
+jobs = data["jobs"]
+
 # POST request
-result = client.post("/job", {"name": "New Job", "location": "123 Main St"})
+job = client.post("/job", {
+    "type": "inspection",
+    "description": "Quarterly HVAC Inspection",
+    "locationId": 123,
+    "vendorId": 456,
+})
 
 # PUT request
-result = client.put("/job/123", {"name": "Updated Job"})
+client.put("/job/123", {"description": "Updated Inspection Description"})
 
-# DELETE request
-result = client.delete("/job/123")
+# DELETE request (returns None)
+client.delete("/location/456")
 ```
+
+### Paginator
+
+Iterate over all pages of a paginated endpoint automatically:
+
+```python
+from servicetrade import Paginator, ServicetradeClient
+
+client = ServicetradeClient(
+    client_id="your_client_id",
+    client_secret="your_client_secret"
+)
+
+paginator = Paginator(client, "/job", "jobs", params={"status": "scheduled"})
+for job in paginator:
+    print(f"Job #{job['id']}: {job['description']}")
+```
+
+The `Paginator` constructor takes:
+- `client` — a `ServicetradeClient` instance
+- `path` — the API endpoint path (e.g., `"/job"`)
+- `items_key` — the key in the response that contains the list of items (e.g., `"jobs"`)
+- `params` — optional dict of query parameters to include on every request
 
 ### File Attachments
 
 ```python
 from servicetrade import ServicetradeClient, FileAttachment
 
-client = ServicetradeClient(username="user", password="pass")
-client.login()
+client = ServicetradeClient(client_id="id", client_secret="secret")
 
 # Upload a file
 file = FileAttachment(
@@ -105,7 +118,7 @@ file = FileAttachment(
 )
 
 result = client.attach(
-    {"entityType": "job", "entityId": 123},
+    {"entityType": 3, "entityId": 123, "purposeId": 7},
     file
 )
 ```
@@ -123,6 +136,35 @@ file = FileAttachment(
 )
 ```
 
+## Response Handling
+
+### Return values
+
+- `get()`, `post()`, `put()` return the `data` field from the response when present, or the full response dict/list otherwise.
+- `delete()` returns `None`.
+
+> **Note:** The PHP SDK returns `null` when there is no `data` key. The Python SDK returns the full response dict instead, which is more useful for endpoints that don't use the `data` wrapper.
+
+### Accessing the full response
+
+Use `get_last_response()` to access status code, headers, and full body:
+
+```python
+result = client.get("/job/123")
+response = client.get_last_response()
+
+print(response.status_code)   # 200
+print(response.is_success())  # True
+print(response.body)          # Full response body (dict)
+print(response.headers)       # Response headers (dict)
+```
+
+### Accessing the auth token
+
+```python
+token = client.get_auth_token()
+```
+
 ## Configuration Options
 
 ```python
@@ -132,10 +174,7 @@ client = ServicetradeClient(
     api_prefix="/api",                         # Default
     user_agent="My App/1.0",                   # Custom user agent
 
-    # Authentication
-    username="user@example.com",
-    password="password",
-    # OR
+    # Authentication (pick one)
     client_id="client_id",
     client_secret="client_secret",
     # OR
@@ -167,13 +206,7 @@ from servicetrade import (
     ServicetradeAPIError,
 )
 
-client = ServicetradeClient(username="user", password="pass")
-
-try:
-    client.login()
-except ServicetradeAuthError as e:
-    print(f"Authentication failed: {e.message}")
-    print(f"Status code: {e.status_code}")
+client = ServicetradeClient(client_id="id", client_secret="secret")
 
 try:
     result = client.get("/nonexistent")
@@ -181,15 +214,34 @@ except ServicetradeAPIError as e:
     print(f"API error: {e.message}")
     print(f"Status code: {e.status_code}")
     print(f"Response data: {e.response_data}")
+
+    # Structured errors from ServiceTrade API
+    if e.error_messages:
+        print(f"Errors: {e.error_messages}")
+    if e.validation:
+        print(f"Validation: {e.validation}")
 ```
 
 ## Authentication Flow
 
-The SDK supports three OAuth2 grant types, prioritized in this order:
+The SDK supports two OAuth2 grant types, prioritized in this order:
 
-1. **Refresh Token Grant** - Most secure, only stores refresh token
-2. **Client Credentials Grant** - For service-to-service authentication
-3. **Password Grant** - Direct user authentication
+1. **Refresh Token Grant** — Most secure, only stores refresh token
+2. **Client Credentials Grant** — For service-to-service authentication
+
+### Lazy Authentication
+
+The SDK automatically authenticates on the first API call if no token exists. You can also call `login()` explicitly for eager authentication:
+
+```python
+client = ServicetradeClient(client_id="id", client_secret="secret")
+
+# Eager authentication (optional)
+client.login()
+
+# Or just make API calls — login happens automatically
+jobs = client.get("/job")
+```
 
 ### Automatic Token Refresh
 
@@ -201,8 +253,8 @@ To disable automatic refresh:
 
 ```python
 client = ServicetradeClient(
-    username="user",
-    password="pass",
+    client_id="id",
+    client_secret="secret",
     auto_refresh_auth=False
 )
 ```
@@ -226,22 +278,9 @@ pip install -e ".[dev]"
 pytest
 ```
 
-### Running Tests with Coverage
+### Type Checking
 
 ```bash
-pytest --cov=servicetrade --cov-report=html
-```
-
-### Linting and Formatting
-
-```bash
-# Check linting
-ruff check src tests
-
-# Format code
-ruff format src tests
-
-# Type checking
 mypy src
 ```
 

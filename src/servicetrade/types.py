@@ -13,6 +13,23 @@ ServicetradeClientResponse = Union[dict[str, Any], list[Any]]
 
 
 @dataclass
+class ServicetradeResponse:
+    """Full HTTP response wrapper with status, body, and headers."""
+
+    status_code: int
+    body: Any
+    headers: dict[str, str]
+
+    def decoded_body(self) -> Any:
+        """Return the response body."""
+        return self.body
+
+    def is_success(self) -> bool:
+        """Check if the response status code indicates success (2xx)."""
+        return 200 <= self.status_code < 300
+
+
+@dataclass
 class FileAttachment:
     value: Union[bytes, io.IOBase, Path]
     filename: str
@@ -35,21 +52,15 @@ class FileAttachment:
 class ServicetradeClientOptions:
     base_url: str = "https://api.servicetrade.com"
     api_prefix: str = "/api"
-    user_agent: str = "Servicetrade Python SDK"
+    user_agent: str = "ServiceTrade Python SDK"
     auto_refresh_auth: bool = True
     on_set_auth: Optional[Callable[[BearerToken], None]] = None
     on_unset_auth: Optional[Callable[[], None]] = None
-    username: Optional[str] = None
-    password: Optional[str] = None
     client_id: Optional[str] = None
     client_secret: Optional[str] = None
     refresh_token: Optional[str] = None
     token: Optional[BearerToken] = None
     custom_headers: dict[str, str] = field(default_factory=dict)
-
-    def has_password_credentials(self) -> bool:
-        """Check if username/password credentials are provided."""
-        return self.username is not None and self.password is not None
 
     def has_client_credentials(self) -> bool:
         """Check if client credentials are provided."""
@@ -62,8 +73,7 @@ class ServicetradeClientOptions:
     def has_any_credentials(self) -> bool:
         """Check if any form of credentials are provided."""
         return (
-            self.has_password_credentials()
-            or self.has_client_credentials()
+            self.has_client_credentials()
             or self.has_refresh_token()
             or self.token is not None
         )
@@ -76,8 +86,6 @@ class Credentials:
     refresh_token: Optional[str] = None
     client_id: Optional[str] = None
     client_secret: Optional[str] = None
-    username: Optional[str] = None
-    password: Optional[str] = None
 
     def to_dict(self) -> dict[str, str]:
         """Convert to dictionary, excluding None values."""
@@ -88,8 +96,4 @@ class Credentials:
             result["client_id"] = self.client_id
         if self.client_secret is not None:
             result["client_secret"] = self.client_secret
-        if self.username is not None:
-            result["username"] = self.username
-        if self.password is not None:
-            result["password"] = self.password
         return result

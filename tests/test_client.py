@@ -13,6 +13,7 @@ from servicetrade import (
     ServicetradeAPIError,
     ServicetradeAuthError,
     ServicetradeClient,
+    ServicetradeResponse,
 )
 
 BASE_URL = "https://api.servicetrade.com"
@@ -20,14 +21,7 @@ API_PREFIX = "/api"
 
 
 def create_mock_token(exp_offset: int = 3600) -> str:
-    """Create a mock JWT token with configurable expiry.
-
-    Args:
-        exp_offset: Seconds from now until expiry.
-
-    Returns:
-        A mock JWT token string.
-    """
+    """Create a mock JWT token with configurable expiry."""
     header = (
         base64.urlsafe_b64encode(json.dumps({"alg": "HS256"}).encode())
         .decode()
@@ -44,31 +38,44 @@ def create_mock_token(exp_offset: int = 3600) -> str:
     return f"{header}.{payload}.{signature}"
 
 
+def mock_auth() -> str:
+    """Register a mock auth endpoint and return the token."""
+    token = create_mock_token()
+    responses.add(
+        responses.POST,
+        f"{BASE_URL}/oauth2/token",
+        json={"access_token": token},
+        status=200,
+    )
+    return token
+
+
 class TestModuleExports:
     """Test module exports and structure."""
 
     def test_exports_servicetrade_client(self):
-        """Should export ServicetradeClient class."""
         from servicetrade import ServicetradeClient
 
         assert ServicetradeClient is not None
 
     def test_exports_types(self):
-        """Should export type definitions."""
         from servicetrade import (
             BearerToken,
             FileAttachment,
+            Paginator,
             ServicetradeClientOptions,
             ServicetradeClientResponse,
+            ServicetradeResponse,
         )
 
         assert BearerToken is not None
         assert FileAttachment is not None
+        assert Paginator is not None
         assert ServicetradeClientOptions is not None
         assert ServicetradeClientResponse is not None
+        assert ServicetradeResponse is not None
 
     def test_exports_exceptions(self):
-        """Should export exception classes."""
         from servicetrade import (
             ServicetradeAPIError,
             ServicetradeAuthError,
@@ -84,76 +91,50 @@ class TestConstructor:
     """Test ServicetradeClient constructor."""
 
     def test_requires_credentials(self):
-        """Should raise error if no credentials provided."""
         with pytest.raises(ServicetradeAuthError) as exc_info:
             ServicetradeClient()
-        assert "Username and password or clientId and clientSecret are required" in str(
-            exc_info.value
-        )
-
-    def test_accepts_username_password(self):
-        """Should accept username and password credentials."""
-        client = ServicetradeClient(username="user", password="pass")
-        assert client is not None
+        assert "required" in str(exc_info.value)
 
     def test_accepts_client_credentials(self):
-        """Should accept client_id and client_secret credentials."""
         client = ServicetradeClient(client_id="id", client_secret="secret")
         assert client is not None
 
     def test_accepts_refresh_token(self):
-        """Should accept refresh token."""
         client = ServicetradeClient(refresh_token="refresh_token")
         assert client is not None
 
     def test_accepts_bearer_token(self):
-        """Should accept pre-existing bearer token."""
         token = create_mock_token()
         client = ServicetradeClient(token=token)
         assert client is not None
 
     def test_custom_base_url(self):
-        """Should accept custom base URL."""
         client = ServicetradeClient(
             base_url="https://staging.servicetrade.com",
-            username="user",
-            password="pass",
+            client_id="id",
+            client_secret="secret",
         )
         assert client._options.base_url == "https://staging.servicetrade.com"
 
     def test_custom_user_agent(self):
-        """Should accept custom user agent."""
         client = ServicetradeClient(
             user_agent="Custom Agent/1.0",
-            username="user",
-            password="pass",
+            client_id="id",
+            client_secret="secret",
         )
         assert client._options.user_agent == "Custom Agent/1.0"
+
+    def test_rejects_username_password(self):
+        """Password grant is not supported — only client_credentials, refresh_token, or token."""
+        with pytest.raises(ServicetradeAuthError):
+            ServicetradeClient(username="user", password="pass")
 
 
 class TestLogin:
     """Test login functionality."""
 
     @responses.activate
-    def test_login_with_password(self):
-        """Should authenticate with username/password."""
-        token = create_mock_token()
-        responses.add(
-            responses.POST,
-            f"{BASE_URL}/oauth2/token",
-            json={"access_token": token},
-            status=200,
-        )
-
-        client = ServicetradeClient(username="user", password="pass")
-        result = client.login()
-
-        assert result == token
-        assert client._token == token
-
-    @responses.activate
     def test_login_with_client_credentials(self):
-        """Should authenticate with client credentials."""
         token = create_mock_token()
         responses.add(
             responses.POST,
@@ -169,7 +150,6 @@ class TestLogin:
 
     @responses.activate
     def test_login_with_refresh_token(self):
-        """Should authenticate with refresh token."""
         token = create_mock_token()
         responses.add(
             responses.POST,
@@ -186,7 +166,6 @@ class TestLogin:
 
     @responses.activate
     def test_login_calls_on_set_auth_callback(self):
-        """Should call on_set_auth callback on successful login."""
         token = create_mock_token()
         responses.add(
             responses.POST,
@@ -197,8 +176,8 @@ class TestLogin:
 
         callback = MagicMock()
         client = ServicetradeClient(
-            username="user",
-            password="pass",
+            client_id="id",
+            client_secret="secret",
             on_set_auth=callback,
         )
         client.login()
@@ -207,7 +186,6 @@ class TestLogin:
 
     @responses.activate
     def test_login_failure(self):
-        """Should raise error on authentication failure."""
         responses.add(
             responses.POST,
             f"{BASE_URL}/oauth2/token",
@@ -215,7 +193,7 @@ class TestLogin:
             status=401,
         )
 
-        client = ServicetradeClient(username="user", password="wrong")
+        client = ServicetradeClient(client_id="id", client_secret="wrong")
 
         with pytest.raises(ServicetradeAuthError) as exc_info:
             client.login()
@@ -228,7 +206,6 @@ class TestLogout:
 
     @responses.activate
     def test_logout_clears_token(self):
-        """Should clear the authentication token."""
         token = create_mock_token()
         responses.add(
             responses.POST,
@@ -250,7 +227,6 @@ class TestLogout:
 
     @responses.activate
     def test_logout_calls_callback(self):
-        """Should call on_unset_auth callback."""
         token = create_mock_token()
         responses.add(
             responses.POST,
@@ -276,7 +252,6 @@ class TestLogout:
 
     @responses.activate
     def test_logout_suppresses_revoke_errors(self):
-        """Should not raise error if token revocation fails."""
         token = create_mock_token()
         responses.add(
             responses.POST,
@@ -301,14 +276,7 @@ class TestHTTPMethods:
 
     @responses.activate
     def test_get_request(self):
-        """Should make GET request."""
-        token = create_mock_token()
-        responses.add(
-            responses.POST,
-            f"{BASE_URL}/oauth2/token",
-            json={"access_token": token},
-            status=200,
-        )
+        mock_auth()
         responses.add(
             responses.GET,
             f"{BASE_URL}{API_PREFIX}/job/123",
@@ -316,7 +284,7 @@ class TestHTTPMethods:
             status=200,
         )
 
-        client = ServicetradeClient(username="user", password="pass")
+        client = ServicetradeClient(client_id="id", client_secret="secret")
         client.login()
         result = client.get("/job/123")
 
@@ -324,14 +292,7 @@ class TestHTTPMethods:
 
     @responses.activate
     def test_post_request(self):
-        """Should make POST request with data."""
-        token = create_mock_token()
-        responses.add(
-            responses.POST,
-            f"{BASE_URL}/oauth2/token",
-            json={"access_token": token},
-            status=200,
-        )
+        mock_auth()
         responses.add(
             responses.POST,
             f"{BASE_URL}{API_PREFIX}/jobitem",
@@ -339,7 +300,7 @@ class TestHTTPMethods:
             status=200,
         )
 
-        client = ServicetradeClient(username="user", password="pass")
+        client = ServicetradeClient(client_id="id", client_secret="secret")
         client.login()
         result = client.post("/jobitem", {"name": "New Item"})
 
@@ -347,14 +308,7 @@ class TestHTTPMethods:
 
     @responses.activate
     def test_put_request(self):
-        """Should make PUT request with data."""
-        token = create_mock_token()
-        responses.add(
-            responses.POST,
-            f"{BASE_URL}/oauth2/token",
-            json={"access_token": token},
-            status=200,
-        )
+        mock_auth()
         responses.add(
             responses.PUT,
             f"{BASE_URL}{API_PREFIX}/jobitem/456",
@@ -362,7 +316,7 @@ class TestHTTPMethods:
             status=200,
         )
 
-        client = ServicetradeClient(username="user", password="pass")
+        client = ServicetradeClient(client_id="id", client_secret="secret")
         client.login()
         result = client.put("/jobitem/456", {"name": "Updated Item"})
 
@@ -370,37 +324,23 @@ class TestHTTPMethods:
 
     @responses.activate
     def test_delete_request(self):
-        """Should make DELETE request."""
-        token = create_mock_token()
-        responses.add(
-            responses.POST,
-            f"{BASE_URL}/oauth2/token",
-            json={"access_token": token},
-            status=200,
-        )
+        mock_auth()
         responses.add(
             responses.DELETE,
             f"{BASE_URL}{API_PREFIX}/job/123",
-            json={"data": {"deleted": True}},
-            status=200,
+            body="",
+            status=204,
         )
 
-        client = ServicetradeClient(username="user", password="pass")
+        client = ServicetradeClient(client_id="id", client_secret="secret")
         client.login()
         result = client.delete("/job/123")
 
-        assert result == {"deleted": True}
+        assert result is None
 
     @responses.activate
     def test_returns_none_for_empty_data(self):
-        """Should return None if response has no data."""
-        token = create_mock_token()
-        responses.add(
-            responses.POST,
-            f"{BASE_URL}/oauth2/token",
-            json={"access_token": token},
-            status=200,
-        )
+        mock_auth()
         responses.add(
             responses.GET,
             f"{BASE_URL}{API_PREFIX}/empty",
@@ -408,7 +348,7 @@ class TestHTTPMethods:
             status=204,
         )
 
-        client = ServicetradeClient(username="user", password="pass")
+        client = ServicetradeClient(client_id="id", client_secret="secret")
         client.login()
         result = client.get("/empty")
 
@@ -416,7 +356,97 @@ class TestHTTPMethods:
 
     @responses.activate
     def test_returns_list_response(self):
-        """Should return list responses directly (not wrapped in data)."""
+        mock_auth()
+        responses.add(
+            responses.GET,
+            f"{BASE_URL}{API_PREFIX}/items",
+            json=[{"id": 1}, {"id": 2}, {"id": 3}],
+            status=200,
+        )
+
+        client = ServicetradeClient(client_id="id", client_secret="secret")
+        client.login()
+        result = client.get("/items")
+
+        assert result == [{"id": 1}, {"id": 2}, {"id": 3}]
+
+
+class TestQueryParameters:
+    """Test query parameter support."""
+
+    @responses.activate
+    def test_get_with_params(self):
+        mock_auth()
+        responses.add(
+            responses.GET,
+            f"{BASE_URL}{API_PREFIX}/job",
+            json={"data": [{"id": 1}]},
+            status=200,
+        )
+
+        client = ServicetradeClient(client_id="id", client_secret="secret")
+        client.login()
+        client.get("/job", params={"status": "open", "page": 0})
+
+        # Verify query params were sent
+        assert "status=open" in responses.calls[-1].request.url
+        assert "page=0" in responses.calls[-1].request.url
+
+    @responses.activate
+    def test_post_with_params(self):
+        mock_auth()
+        responses.add(
+            responses.POST,
+            f"{BASE_URL}{API_PREFIX}/job",
+            json={"data": {"id": 1}},
+            status=200,
+        )
+
+        client = ServicetradeClient(client_id="id", client_secret="secret")
+        client.login()
+        client.post("/job", {"name": "Test"}, params={"draft": "true"})
+
+        assert "draft=true" in responses.calls[-1].request.url
+
+    @responses.activate
+    def test_put_with_params(self):
+        mock_auth()
+        responses.add(
+            responses.PUT,
+            f"{BASE_URL}{API_PREFIX}/job/1",
+            json={"data": {"id": 1}},
+            status=200,
+        )
+
+        client = ServicetradeClient(client_id="id", client_secret="secret")
+        client.login()
+        client.put("/job/1", {"name": "Test"}, params={"notify": "true"})
+
+        assert "notify=true" in responses.calls[-1].request.url
+
+    @responses.activate
+    def test_delete_with_params(self):
+        mock_auth()
+        responses.add(
+            responses.DELETE,
+            f"{BASE_URL}{API_PREFIX}/job/1",
+            body="",
+            status=204,
+        )
+
+        client = ServicetradeClient(client_id="id", client_secret="secret")
+        client.login()
+        client.delete("/job/1", params={"force": "true"})
+
+        assert "force=true" in responses.calls[-1].request.url
+
+
+class TestLazyAuth:
+    """Test lazy authentication (auto-login on first request)."""
+
+    @responses.activate
+    def test_get_without_login(self):
+        """Should automatically login on first API call."""
         token = create_mock_token()
         responses.add(
             responses.POST,
@@ -426,16 +456,216 @@ class TestHTTPMethods:
         )
         responses.add(
             responses.GET,
-            f"{BASE_URL}{API_PREFIX}/items",
-            json=[{"id": 1}, {"id": 2}, {"id": 3}],
+            f"{BASE_URL}{API_PREFIX}/job/1",
+            json={"data": {"id": 1}},
             status=200,
         )
 
-        client = ServicetradeClient(username="user", password="pass")
-        client.login()
-        result = client.get("/items")
+        client = ServicetradeClient(client_id="id", client_secret="secret")
+        # No login() call — should auto-authenticate
+        result = client.get("/job/1")
 
-        assert result == [{"id": 1}, {"id": 2}, {"id": 3}]
+        assert result == {"id": 1}
+        assert client._token == token
+
+    @responses.activate
+    def test_token_only_no_lazy_auth(self):
+        """With only a pre-existing token and no credentials, should use the token directly."""
+        token = create_mock_token()
+        responses.add(
+            responses.GET,
+            f"{BASE_URL}{API_PREFIX}/job/1",
+            json={"data": {"id": 1}},
+            status=200,
+        )
+
+        client = ServicetradeClient(token=token)
+        result = client.get("/job/1")
+
+        assert result == {"id": 1}
+
+
+class TestDeleteReturnsNone:
+    """Test that delete() returns None."""
+
+    @responses.activate
+    def test_delete_returns_none(self):
+        mock_auth()
+        responses.add(
+            responses.DELETE,
+            f"{BASE_URL}{API_PREFIX}/job/123",
+            json={"data": {"deleted": True}},
+            status=200,
+        )
+
+        client = ServicetradeClient(client_id="id", client_secret="secret")
+        client.login()
+        result = client.delete("/job/123")
+
+        assert result is None
+
+
+class TestGetAuthToken:
+    """Test get_auth_token() accessor."""
+
+    def test_returns_none_before_login(self):
+        client = ServicetradeClient(client_id="id", client_secret="secret")
+        assert client.get_auth_token() is None
+
+    @responses.activate
+    def test_returns_token_after_login(self):
+        token = create_mock_token()
+        responses.add(
+            responses.POST,
+            f"{BASE_URL}/oauth2/token",
+            json={"access_token": token},
+            status=200,
+        )
+
+        client = ServicetradeClient(client_id="id", client_secret="secret")
+        client.login()
+
+        assert client.get_auth_token() == token
+
+
+class TestGetLastResponse:
+    """Test get_last_response()."""
+
+    @responses.activate
+    def test_returns_none_before_request(self):
+        client = ServicetradeClient(client_id="id", client_secret="secret")
+        assert client.get_last_response() is None
+
+    @responses.activate
+    def test_returns_response_after_request(self):
+        mock_auth()
+        responses.add(
+            responses.GET,
+            f"{BASE_URL}{API_PREFIX}/job/1",
+            json={"data": {"id": 1}},
+            status=200,
+        )
+
+        client = ServicetradeClient(client_id="id", client_secret="secret")
+        client.login()
+        client.get("/job/1")
+
+        last = client.get_last_response()
+        assert last is not None
+        assert isinstance(last, ServicetradeResponse)
+        assert last.status_code == 200
+        assert last.is_success()
+        assert last.body == {"data": {"id": 1}}
+        assert last.decoded_body() == {"data": {"id": 1}}
+
+    @responses.activate
+    def test_stores_error_response(self):
+        mock_auth()
+        responses.add(
+            responses.GET,
+            f"{BASE_URL}{API_PREFIX}/bad",
+            json={"error": "not found"},
+            status=404,
+        )
+
+        client = ServicetradeClient(client_id="id", client_secret="secret")
+        client.login()
+
+        with pytest.raises(ServicetradeAPIError):
+            client.get("/bad")
+
+        last = client.get_last_response()
+        assert last is not None
+        assert last.status_code == 404
+        assert not last.is_success()
+
+
+class TestReentrancyGuard:
+    """Test reentrancy guard on login."""
+
+    @responses.activate
+    def test_prevents_recursive_login(self):
+        """on_set_auth callback calling login() should raise."""
+        token = create_mock_token()
+        responses.add(
+            responses.POST,
+            f"{BASE_URL}/oauth2/token",
+            json={"access_token": token},
+            status=200,
+        )
+
+        def bad_callback(t: str) -> None:
+            client.login()  # This should trigger reentrancy guard
+
+        client = ServicetradeClient(
+            client_id="id",
+            client_secret="secret",
+            on_set_auth=bad_callback,
+        )
+
+        with pytest.raises(ServicetradeAuthError, match="reentrancy"):
+            client.login()
+
+
+class TestURLNormalization:
+    """Test URL normalization."""
+
+    def test_strips_trailing_slash_from_base_url(self):
+        client = ServicetradeClient(
+            base_url="https://api.servicetrade.com/",
+            client_id="id",
+            client_secret="secret",
+        )
+        assert client._options.base_url == "https://api.servicetrade.com"
+
+    def test_normalizes_api_prefix(self):
+        client = ServicetradeClient(
+            api_prefix="api",
+            client_id="id",
+            client_secret="secret",
+        )
+        assert client._options.api_prefix == "/api"
+
+    @responses.activate
+    def test_normalizes_path_in_request(self):
+        """Paths without leading slash should still work."""
+        mock_auth()
+        responses.add(
+            responses.GET,
+            f"{BASE_URL}{API_PREFIX}/job/1",
+            json={"data": {"id": 1}},
+            status=200,
+        )
+
+        client = ServicetradeClient(client_id="id", client_secret="secret")
+        client.login()
+        result = client.get("job/1")
+
+        assert result == {"id": 1}
+
+    @responses.activate
+    def test_no_double_slash(self):
+        """Trailing slash on base_url + leading slash on path should not cause double slashes."""
+        mock_auth()
+        responses.add(
+            responses.GET,
+            f"{BASE_URL}{API_PREFIX}/job/1",
+            json={"data": {"id": 1}},
+            status=200,
+        )
+
+        client = ServicetradeClient(
+            base_url="https://api.servicetrade.com/",
+            client_id="id",
+            client_secret="secret",
+        )
+        client.login()
+        result = client.get("/job/1")
+
+        assert result == {"id": 1}
+        # Verify no double slashes in the URL (excluding https://)
+        request_url = responses.calls[-1].request.url
+        assert "//" not in request_url.replace("https://", "")
 
 
 class TestAutoRefresh:
@@ -443,7 +673,6 @@ class TestAutoRefresh:
 
     @responses.activate
     def test_refreshes_on_401(self):
-        """Should automatically refresh token on 401 response."""
         old_token = create_mock_token()
         new_token = create_mock_token()
 
@@ -475,7 +704,7 @@ class TestAutoRefresh:
             status=200,
         )
 
-        client = ServicetradeClient(username="user", password="pass")
+        client = ServicetradeClient(client_id="id", client_secret="secret")
         client.login()
         result = client.get("/job/123")
 
@@ -484,8 +713,6 @@ class TestAutoRefresh:
 
     @responses.activate
     def test_refreshes_stale_token_before_request(self):
-        """Should refresh token before request if about to expire."""
-        # Create an expired token
         expired_token = create_mock_token(exp_offset=-100)
         new_token = create_mock_token()
 
@@ -503,7 +730,7 @@ class TestAutoRefresh:
         )
 
         client = ServicetradeClient(
-            token=expired_token, username="user", password="pass"
+            token=expired_token, client_id="id", client_secret="secret"
         )
         result = client.get("/job/123")
 
@@ -516,14 +743,7 @@ class TestFileAttachment:
 
     @responses.activate
     def test_attach_file(self):
-        """Should upload file attachment."""
-        token = create_mock_token()
-        responses.add(
-            responses.POST,
-            f"{BASE_URL}/oauth2/token",
-            json={"access_token": token},
-            status=200,
-        )
+        mock_auth()
         responses.add(
             responses.POST,
             f"{BASE_URL}{API_PREFIX}/attachment",
@@ -531,7 +751,7 @@ class TestFileAttachment:
             status=200,
         )
 
-        client = ServicetradeClient(username="user", password="pass")
+        client = ServicetradeClient(client_id="id", client_secret="secret")
         client.login()
 
         file = FileAttachment(
@@ -549,14 +769,7 @@ class TestCustomHeaders:
 
     @responses.activate
     def test_set_custom_header(self):
-        """Should include custom headers in requests."""
-        token = create_mock_token()
-        responses.add(
-            responses.POST,
-            f"{BASE_URL}/oauth2/token",
-            json={"access_token": token},
-            status=200,
-        )
+        mock_auth()
 
         def request_callback(request):
             assert request.headers.get("X-Custom-Header") == "custom-value"
@@ -568,7 +781,7 @@ class TestCustomHeaders:
             callback=request_callback,
         )
 
-        client = ServicetradeClient(username="user", password="pass")
+        client = ServicetradeClient(client_id="id", client_secret="secret")
         client.login()
         client.set_custom_header("X-Custom-Header", "custom-value")
         result = client.get("/test")
@@ -577,7 +790,6 @@ class TestCustomHeaders:
 
     @responses.activate
     def test_custom_user_agent(self):
-        """Should use custom user agent."""
         token = create_mock_token()
 
         def auth_callback(request):
@@ -591,8 +803,8 @@ class TestCustomHeaders:
         )
 
         client = ServicetradeClient(
-            username="user",
-            password="pass",
+            client_id="id",
+            client_secret="secret",
             user_agent="Custom/1.0",
         )
         client.login()
@@ -603,14 +815,7 @@ class TestErrorHandling:
 
     @responses.activate
     def test_api_error_includes_status_code(self):
-        """Should include status code in API errors."""
-        token = create_mock_token()
-        responses.add(
-            responses.POST,
-            f"{BASE_URL}/oauth2/token",
-            json={"access_token": token},
-            status=200,
-        )
+        mock_auth()
         responses.add(
             responses.GET,
             f"{BASE_URL}{API_PREFIX}/notfound",
@@ -618,7 +823,7 @@ class TestErrorHandling:
             status=404,
         )
 
-        client = ServicetradeClient(username="user", password="pass")
+        client = ServicetradeClient(client_id="id", client_secret="secret")
         client.login()
 
         with pytest.raises(ServicetradeAPIError) as exc_info:
@@ -628,14 +833,7 @@ class TestErrorHandling:
 
     @responses.activate
     def test_api_error_includes_response_data(self):
-        """Should include response data in API errors."""
-        token = create_mock_token()
-        responses.add(
-            responses.POST,
-            f"{BASE_URL}/oauth2/token",
-            json={"access_token": token},
-            status=200,
-        )
+        mock_auth()
         responses.add(
             responses.POST,
             f"{BASE_URL}{API_PREFIX}/invalid",
@@ -643,7 +841,7 @@ class TestErrorHandling:
             status=400,
         )
 
-        client = ServicetradeClient(username="user", password="pass")
+        client = ServicetradeClient(client_id="id", client_secret="secret")
         client.login()
 
         with pytest.raises(ServicetradeAPIError) as exc_info:
@@ -651,3 +849,54 @@ class TestErrorHandling:
 
         assert exc_info.value.response_data is not None
         assert exc_info.value.response_data.get("error") == "Validation failed"
+
+
+class TestEnhancedExceptions:
+    """Test structured error parsing in ServicetradeAPIError."""
+
+    def test_parses_error_messages(self):
+        response_data = {
+            "messages": {
+                "error": ["Something went wrong", "Another error"]
+            }
+        }
+        err = ServicetradeAPIError("fail", status_code=400, response_data=response_data)
+        assert err.error_messages == ["Something went wrong", "Another error"]
+        assert "Something went wrong" in err.message
+
+    def test_parses_validation_messages(self):
+        response_data = {
+            "messages": {
+                "validation": ["Field X is required", "Field Y is too long"]
+            }
+        }
+        err = ServicetradeAPIError("fail", status_code=422, response_data=response_data)
+        assert err.validation == ["Field X is required", "Field Y is too long"]
+        assert "Field X is required" in err.message
+
+    def test_parses_both_error_and_validation(self):
+        response_data = {
+            "messages": {
+                "error": ["General failure"],
+                "validation": ["Bad field"],
+            }
+        }
+        err = ServicetradeAPIError("fail", status_code=400, response_data=response_data)
+        assert err.error_messages == ["General failure"]
+        assert err.validation == ["Bad field"]
+
+    def test_handles_missing_messages(self):
+        err = ServicetradeAPIError("fail", status_code=500, response_data={"other": "data"})
+        assert err.error_messages == []
+        assert err.validation == []
+        assert err.message == "fail"
+
+    def test_handles_none_response_data(self):
+        err = ServicetradeAPIError("fail", status_code=500)
+        assert err.error_messages == []
+        assert err.validation == []
+
+    def test_handles_string_error(self):
+        response_data = {"messages": {"error": "single error string"}}
+        err = ServicetradeAPIError("fail", status_code=400, response_data=response_data)
+        assert err.error_messages == ["single error string"]
