@@ -16,8 +16,8 @@ pip install servicetrade
 from servicetrade import ServicetradeClient
 
 client = ServicetradeClient(
-    client_id="your_client_id",
-    client_secret="your_client_secret"
+    client_id="your-client-id",
+    client_secret="your-client-secret"
 )
 
 # No need to call login() — the SDK authenticates lazily on the first API call.
@@ -31,7 +31,7 @@ print(jobs)
 from servicetrade import ServicetradeClient
 
 client = ServicetradeClient(
-    refresh_token="your_refresh_token"
+    refresh_token="your-refresh-token"
 )
 
 jobs = client.get("/job")
@@ -43,10 +43,10 @@ jobs = client.get("/job")
 from servicetrade import ServicetradeClient
 
 client = ServicetradeClient(
-    token="your_bearer_token",
+    token="your-bearer-token",
     # Provide credentials for auto-refresh when the token expires
-    client_id="your_client_id",
-    client_secret="your_client_secret"
+    client_id="your-client-id",
+    client_secret="your-client-secret"
 )
 
 # No login needed if token is valid
@@ -88,8 +88,8 @@ Iterate over all pages of a paginated endpoint automatically:
 from servicetrade import Paginator, ServicetradeClient
 
 client = ServicetradeClient(
-    client_id="your_client_id",
-    client_secret="your_client_secret"
+    client_id="your-client-id",
+    client_secret="your-client-secret"
 )
 
 paginator = Paginator(client, "/job", "jobs", params={"status": "scheduled"})
@@ -108,7 +108,7 @@ The `Paginator` constructor takes:
 ```python
 from servicetrade import ServicetradeClient, FileAttachment
 
-client = ServicetradeClient(client_id="id", client_secret="secret")
+client = ServicetradeClient(client_id="your-client-id", client_secret="your-client-secret")
 
 # Upload a file
 file = FileAttachment(
@@ -143,8 +143,6 @@ file = FileAttachment(
 - `get()`, `post()`, `put()` return the `data` field from the response when present, or the full response dict/list otherwise.
 - `delete()` returns `None`.
 
-> **Note:** The PHP SDK returns `null` when there is no `data` key. The Python SDK returns the full response dict instead, which is more useful for endpoints that don't use the `data` wrapper.
-
 ### Accessing the full response
 
 Use `get_last_response()` to access status code, headers, and full body:
@@ -175,12 +173,12 @@ client = ServicetradeClient(
     user_agent="My App/1.0",                   # Custom user agent
 
     # Authentication (pick one)
-    client_id="client_id",
-    client_secret="client_secret",
+    client_id="your-client-id",
+    client_secret="your-client-secret",
     # OR
-    refresh_token="refresh_token",
+    refresh_token="your-refresh-token",
     # OR
-    token="existing_bearer_token",
+    token="your-bearer-token",
 
     # Options
     auto_refresh_auth=True,                    # Auto-refresh tokens (default)
@@ -206,7 +204,7 @@ from servicetrade import (
     ServicetradeAPIError,
 )
 
-client = ServicetradeClient(client_id="id", client_secret="secret")
+client = ServicetradeClient(client_id="your-client-id", client_secret="your-client-secret")
 
 try:
     result = client.get("/nonexistent")
@@ -234,7 +232,7 @@ The SDK supports two OAuth2 grant types, prioritized in this order:
 The SDK automatically authenticates on the first API call if no token exists. You can also call `login()` explicitly for eager authentication:
 
 ```python
-client = ServicetradeClient(client_id="id", client_secret="secret")
+client = ServicetradeClient(client_id="your-client-id", client_secret="your-client-secret")
 
 # Eager authentication (optional)
 client.login()
