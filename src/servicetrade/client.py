@@ -313,6 +313,8 @@ class ServicetradeClient:
             ):
                 self.login()
                 headers = self._get_headers()
+                if files:
+                    headers.pop("Content-Type", None)
                 # Retry the request
                 if method == "GET":
                     response = self._session.get(url, headers=headers, params=params)

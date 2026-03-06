@@ -762,6 +762,54 @@ class TestFileAttachment:
 
         assert result == {"id": 789, "filename": "test.txt"}
 
+    @responses.activate
+    def test_attach_file_retries_after_401(self):
+        """Verify multipart uploads don't get a JSON Content-Type on 401 retry."""
+        old_token = create_mock_token()
+        new_token = create_mock_token()
+
+        responses.add(
+            responses.POST,
+            f"{BASE_URL}/oauth2/token",
+            json={"access_token": old_token},
+            status=200,
+        )
+        # First upload attempt returns 401
+        responses.add(
+            responses.POST,
+            f"{BASE_URL}{API_PREFIX}/attachment",
+            status=401,
+        )
+        # Token refresh
+        responses.add(
+            responses.POST,
+            f"{BASE_URL}/oauth2/token",
+            json={"access_token": new_token},
+            status=200,
+        )
+        # Retry succeeds
+        responses.add(
+            responses.POST,
+            f"{BASE_URL}{API_PREFIX}/attachment",
+            json={"data": {"id": 790, "filename": "retry.txt"}},
+            status=200,
+        )
+
+        client = ServicetradeClient(client_id="id", client_secret="secret")
+        client.login()
+
+        file = FileAttachment(
+            value=b"retry content",
+            filename="retry.txt",
+            content_type="text/plain",
+        )
+        result = client.attach({"description": "Retry file"}, file)
+
+        assert result == {"id": 790, "filename": "retry.txt"}
+        # The retry request must use multipart/form-data, not application/json
+        retry_request = responses.calls[-1].request
+        assert retry_request.headers["Content-Type"].startswith("multipart/form-data")
+
 
 class TestCustomHeaders:
     """Test custom header functionality."""
