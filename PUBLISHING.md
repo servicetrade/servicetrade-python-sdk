@@ -36,6 +36,3 @@ The GitHub repo must be configured as a [trusted publisher](https://docs.pypi.or
 - **Owner:** `servicetrade`
 - **Repository:** `servicetrade-python-sdk`
 - **Workflow:** `publish.yml`
-- **Environment:** `release`
-
-A `release` environment must exist in the repo's GitHub Settings > Environments.
