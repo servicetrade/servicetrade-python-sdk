@@ -33,7 +33,7 @@ def mock_auth() -> str:
     token = create_mock_token()
     responses.add(
         responses.POST,
-        f"{BASE_URL}/oauth2/token",
+        f"{BASE_URL}{API_PREFIX}/oauth2/token",
         json={"access_token": token},
         status=200,
     )

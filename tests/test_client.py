@@ -43,7 +43,7 @@ def mock_auth() -> str:
     token = create_mock_token()
     responses.add(
         responses.POST,
-        f"{BASE_URL}/oauth2/token",
+        f"{BASE_URL}{API_PREFIX}/oauth2/token",
         json={"access_token": token},
         status=200,
     )
@@ -138,7 +138,7 @@ class TestLogin:
         token = create_mock_token()
         responses.add(
             responses.POST,
-            f"{BASE_URL}/oauth2/token",
+            f"{BASE_URL}{API_PREFIX}/oauth2/token",
             json={"access_token": token},
             status=200,
         )
@@ -153,7 +153,7 @@ class TestLogin:
         token = create_mock_token()
         responses.add(
             responses.POST,
-            f"{BASE_URL}/oauth2/token",
+            f"{BASE_URL}{API_PREFIX}/oauth2/token",
             json={"access_token": token, "refresh_token": "new_refresh"},
             status=200,
         )
@@ -169,7 +169,7 @@ class TestLogin:
         token = create_mock_token()
         responses.add(
             responses.POST,
-            f"{BASE_URL}/oauth2/token",
+            f"{BASE_URL}{API_PREFIX}/oauth2/token",
             json={"access_token": token},
             status=200,
         )
@@ -188,7 +188,7 @@ class TestLogin:
     def test_login_failure(self):
         responses.add(
             responses.POST,
-            f"{BASE_URL}/oauth2/token",
+            f"{BASE_URL}{API_PREFIX}/oauth2/token",
             json={"error": "invalid_grant"},
             status=401,
         )
@@ -209,13 +209,13 @@ class TestLogout:
         token = create_mock_token()
         responses.add(
             responses.POST,
-            f"{BASE_URL}/oauth2/token",
+            f"{BASE_URL}{API_PREFIX}/oauth2/token",
             json={"access_token": token, "refresh_token": "refresh"},
             status=200,
         )
         responses.add(
             responses.POST,
-            f"{BASE_URL}/oauth2/revoke",
+            f"{BASE_URL}{API_PREFIX}/oauth2/revoke",
             status=200,
         )
 
@@ -230,13 +230,13 @@ class TestLogout:
         token = create_mock_token()
         responses.add(
             responses.POST,
-            f"{BASE_URL}/oauth2/token",
+            f"{BASE_URL}{API_PREFIX}/oauth2/token",
             json={"access_token": token},
             status=200,
         )
         responses.add(
             responses.POST,
-            f"{BASE_URL}/oauth2/revoke",
+            f"{BASE_URL}{API_PREFIX}/oauth2/revoke",
             status=200,
         )
 
@@ -255,13 +255,13 @@ class TestLogout:
         token = create_mock_token()
         responses.add(
             responses.POST,
-            f"{BASE_URL}/oauth2/token",
+            f"{BASE_URL}{API_PREFIX}/oauth2/token",
             json={"access_token": token, "refresh_token": "refresh"},
             status=200,
         )
         responses.add(
             responses.POST,
-            f"{BASE_URL}/oauth2/revoke",
+            f"{BASE_URL}{API_PREFIX}/oauth2/revoke",
             status=500,
         )
 
@@ -450,7 +450,7 @@ class TestLazyAuth:
         token = create_mock_token()
         responses.add(
             responses.POST,
-            f"{BASE_URL}/oauth2/token",
+            f"{BASE_URL}{API_PREFIX}/oauth2/token",
             json={"access_token": token},
             status=200,
         )
@@ -517,7 +517,7 @@ class TestGetAuthToken:
         token = create_mock_token()
         responses.add(
             responses.POST,
-            f"{BASE_URL}/oauth2/token",
+            f"{BASE_URL}{API_PREFIX}/oauth2/token",
             json={"access_token": token},
             status=200,
         )
@@ -588,7 +588,7 @@ class TestReentrancyGuard:
         token = create_mock_token()
         responses.add(
             responses.POST,
-            f"{BASE_URL}/oauth2/token",
+            f"{BASE_URL}{API_PREFIX}/oauth2/token",
             json={"access_token": token},
             status=200,
         )
@@ -678,7 +678,7 @@ class TestAutoRefresh:
         # Initial login
         responses.add(
             responses.POST,
-            f"{BASE_URL}/oauth2/token",
+            f"{BASE_URL}{API_PREFIX}/oauth2/token",
             json={"access_token": old_token},
             status=200,
         )
@@ -691,7 +691,7 @@ class TestAutoRefresh:
         # Refresh token
         responses.add(
             responses.POST,
-            f"{BASE_URL}/oauth2/token",
+            f"{BASE_URL}{API_PREFIX}/oauth2/token",
             json={"access_token": new_token},
             status=200,
         )
@@ -717,7 +717,7 @@ class TestAutoRefresh:
 
         responses.add(
             responses.POST,
-            f"{BASE_URL}/oauth2/token",
+            f"{BASE_URL}{API_PREFIX}/oauth2/token",
             json={"access_token": new_token},
             status=200,
         )
@@ -770,7 +770,7 @@ class TestFileAttachment:
 
         responses.add(
             responses.POST,
-            f"{BASE_URL}/oauth2/token",
+            f"{BASE_URL}{API_PREFIX}/oauth2/token",
             json={"access_token": old_token},
             status=200,
         )
@@ -783,7 +783,7 @@ class TestFileAttachment:
         # Token refresh
         responses.add(
             responses.POST,
-            f"{BASE_URL}/oauth2/token",
+            f"{BASE_URL}{API_PREFIX}/oauth2/token",
             json={"access_token": new_token},
             status=200,
         )
@@ -845,7 +845,7 @@ class TestCustomHeaders:
 
         responses.add_callback(
             responses.POST,
-            f"{BASE_URL}/oauth2/token",
+            f"{BASE_URL}{API_PREFIX}/oauth2/token",
             callback=auth_callback,
         )
 
