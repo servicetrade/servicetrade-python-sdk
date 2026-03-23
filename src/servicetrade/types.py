@@ -20,10 +20,6 @@ class ServicetradeResponse:
     body: Any
     headers: dict[str, str]
 
-    def decoded_body(self) -> Any:
-        """Return the response body."""
-        return self.body
-
     def is_success(self) -> bool:
         """Check if the response status code indicates success (2xx)."""
         return 200 <= self.status_code < 300

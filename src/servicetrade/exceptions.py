@@ -1,6 +1,6 @@
 """Custom exceptions for the ServiceTrade Python SDK."""
 
-from typing import Any, List, Optional
+from typing import Any, Optional
 
 
 class ServicetradeError(Exception):
@@ -33,8 +33,8 @@ class ServicetradeAPIError(ServicetradeError):
     ) -> None:
         self.status_code = status_code
         self.response_data = response_data
-        self.error_messages: List[str] = []
-        self.validation: List[str] = []
+        self.error_messages: list[str] = []
+        self.validation: list[str] = []
 
         # Parse structured error format from ServiceTrade API
         if isinstance(response_data, dict):

@@ -112,6 +112,10 @@ class ServicetradeClient:
 
         return session
 
+    @property
+    def _base_api_url(self) -> str:
+        return f"{self._options.base_url}{self._options.api_prefix}"
+
     def _get_headers(self, include_auth: bool = True) -> dict[str, str]:
         """Get headers for requests."""
         headers = {
@@ -194,7 +198,7 @@ class ServicetradeClient:
 
         self._refreshing = True
         try:
-            url = f"{self._options.base_url}/oauth2/token"
+            url = f"{self._base_api_url}/oauth2/token"
             headers = {
                 "User-Agent": self._options.user_agent,
                 "Content-Type": "application/x-www-form-urlencoded",
@@ -251,7 +255,7 @@ class ServicetradeClient:
         # Attempt to revoke refresh token (suppress errors)
         if self._credentials and self._credentials.refresh_token:
             try:
-                url = f"{self._options.base_url}/oauth2/revoke"
+                url = f"{self._base_api_url}/oauth2/revoke"
                 headers = {
                     "User-Agent": self._options.user_agent,
                     "Content-Type": "application/x-www-form-urlencoded",
@@ -281,7 +285,7 @@ class ServicetradeClient:
 
         # Normalize path to have leading slash
         path = "/" + path.lstrip("/")
-        url = f"{self._options.base_url}{self._options.api_prefix}{path}"
+        url = f"{self._base_api_url}{path}"
         headers = self._get_headers()
 
         # Remove Content-Type for multipart requests

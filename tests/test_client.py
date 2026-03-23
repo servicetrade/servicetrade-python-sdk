@@ -555,7 +555,7 @@ class TestGetLastResponse:
         assert last.status_code == 200
         assert last.is_success()
         assert last.body == {"data": {"id": 1}}
-        assert last.decoded_body() == {"data": {"id": 1}}
+        assert last.body == {"data": {"id": 1}}
 
     @responses.activate
     def test_stores_error_response(self):

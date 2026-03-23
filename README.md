@@ -84,7 +84,7 @@ client.delete("/location/456")
 Iterate over all pages of a paginated endpoint automatically:
 
 ```python
-from servicetrade import Paginator, ServicetradeClient
+from servicetrade import Paginator, ServicetradeClient, ServicetradeAPIError
 
 client = ServicetradeClient(
     client_id="your-client-id",
@@ -92,8 +92,11 @@ client = ServicetradeClient(
 )
 
 paginator = Paginator(client, "/job", "jobs", params={"status": "scheduled"})
-for job in paginator:
-    print(f"Job #{job['id']}: {job['description']}")
+try:
+    for job in paginator:
+        print(f"Job #{job['id']}: {job['description']}")
+except ServicetradeAPIError as e:
+    print(f"Error during pagination: {e.message}")
 ```
 
 The `Paginator` constructor takes:
@@ -141,6 +144,7 @@ file = FileAttachment(
 
 - `get()`, `post()`, `put()` return the `data` field from the response when present, or the full response dict/list otherwise.
 - `delete()` returns `None`.
+- When fetching a single resource by ID (e.g., `/job/123`), the response is a `dict`. When querying a collection (e.g., `/job`), the response may be a `dict` containing a list under a resource-specific key (e.g., `"jobs"`).
 
 ### Accessing the full response
 
